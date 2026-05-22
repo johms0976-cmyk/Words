@@ -1,0 +1,403 @@
+#!/usr/bin/env python3
+"""
+The Countdown Game - LAN host
+Run this on ONE computer. Both players open the address it prints, in a browser
+on the same network, then choose "Play over LAN".
+
+    python3 server.py            # default port 8000
+    python3 server.py 9000       # custom port
+
+No external libraries required (Python 3.7+).
+"""
+import json, os, sys, random, time, socket, threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse, parse_qs
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+HTML_PATH = os.path.join(HERE, 'countdown-lan.html')
+
+# Weighted letter bags (echo letter frequency)
+VOWEL_BAG = list('a'*15 + 'e'*21 + 'i'*13 + 'o'*13 + 'u'*5)
+CONS_BAG = list('b'*2+'c'*3+'d'*6+'f'*2+'g'*3+'h'*2+'j'*1+'k'*1+'l'*5+'m'*4
+                +'n'*8+'p'*4+'q'*1+'r'*9+'s'*9+'t'*9+'v'*1+'w'*1+'x'*1+'y'*1+'z'*1)
+
+# 9-letter words used to set/validate the conundrum (injected at build time)
+CONUNDRUM_WORDS = "something beautiful everybody different important sometimes somewhere gentlemen wonderful yesterday questions president happening certainly seriously situation dangerous attention detective difficult afternoon screaming obviously boyfriend apartment professor beginning continues listening otherwise surprised ourselves according breakfast following wondering excellent commander necessary apologize inspector emergency operation challenge fantastic character breathing perfectly forgotten concerned condition recognize destroyed brilliant thousands happiness interview expecting gentleman introduce community basically expensive secretary assistant including mentioned telephone insurance political statement delicious knowledge celebrate carefully direction committed chocolate advantage chuckling available christian treatment disappear extremely suffering literally mountains desperate convinced announcer champagne therefore explosion cigarette sacrifice ambulance equipment searching connected newspaper customers witnesses education authority nightmare emotional agreement naturally abandoned guarantee childhood potential committee subtitles impressed prisoners sensitive hopefully miserable decisions kidnapped creatures charlotte surrender financial influence footsteps goodnight delivered confirmed principal greetings neighbors religious recording answering someplace interrupt satisfied documents tradition defendant adventure territory developed favourite strangers existence returning confident bothering policeman precisely criminals underwear traveling signature countries companies represent interests terrorist procedure meanwhile furniture transport protected lightning exhausted daughters scientist intention alexander invisible objection relatives separated shoulders colleague warehouse honeymoon testimony whistling buildings employees currently depressed resources centuries explained structure paperwork reception recommend complaint satellite temporary effective forbidden discovery suspected suggested delighted valentine terrified preparing paintings computers executive regarding technique cellphone backwards promotion permanent interfere recovered ancestors completed recognise radiation candidate immediate organized dismissed continued spiritual rehearsal overnight determine elsewhere practical operating apologies personnel counselor corrected remaining anonymous reporting described attracted believing discussed attacking dedicated corporate requested surprises cooperate worthless relations infection suspended volunteer positions communist blackmail attempted gathering institute principle therapist residence democracy published execution technical disturbed wandering apologise broadcast behaviour constable marvelous performed respected finishing affection privilege celebrity defending suspicion convicted confusing generally receiving reporters associate manhattan confessed scheduled negotiate reference collected fortunate survivors encounter passenger accompany spreading hilarious exclusive confusion programme contacted chemistry companion publicity butterfly establish gratitude exception essential magazines murmuring announced messenger pregnancy innocence presented remembers household possessed curiosity officials materials standards offensive qualified fireworks correctly collapsed eliminate cancelled witnessed graduated hospitals squealing strongest evolution bartender inaudible movements murderers perimeter honorable increased scoundrel referring poisoning conscious instincts landscape invention integrity promising objective briefcase embarrass encourage heartbeat identical classical neighbour vengeance residents substance accidents alcoholic wrestling automatic salvation slightest explosive forensics civilians ambitious orchestra succeeded frequency depending sentenced swallowed architect instantly orphanage autograph villagers abilities obsession batteries appointed lifestyle dimension bodyguard courtroom pointless demanding efficient slaughter marijuana legendary pretended detention breakdown attending moonlight contracts scattered crackling handcuffs entertain particles violation universal chemicals directors shattered departure spaghetti elephants contained sustained generator arresting continent godfather marketing accepting probation hurricane flattered blessings supported collector physician followers submarine astronaut classroom teenagers condemned muttering selection squeaking alongside translate policemen primitive qualities defensive sensation strangled clearance mushrooms realistic engineers inherited arguments musicians insulting sincerely spaceship injection virtually formation murdering repeating vegetable languages pronounce elections narrating imagining fulfilled dinosaurs rebellion preferred battalion moustache assaulted surviving container clamoring indicates sanctuary producers righteous specialty regularly gradually injustice graveyard strangely activated installed discharge authentic addiction involving poisonous diagnosis locations extension transform providing overboard elaborate mysteries mechanism smuggling countless distorted superhero terrorism decorated specially producing occasions inventory imaginary artillery telescope shameless worldwide treasures cafeteria monastery impatient ignorance predicted civilized competing voiceover carpenter upsetting narcotics foreigner travelled microwave groceries imitating informant fantasies fisherman nightclub overheard machinery predators expertise passports permitted addresses expressed conducted admission sentences addressed priceless backstage functions factories exquisite headaches secondary investors purchased splitting notorious cathedral judgement triggered seventeen virginity torturing allowance gangsters publisher troubling trembling humiliate superstar struggled spotlight isolation greatness marriages conquered scratched genuinely exercises testament paralyzed headlines responded fragments releasing incapable privately jewellery hamburger conductor ministers incidents vibrating prettiest starboard chauffeur strategic heartless protector switching favorites extensive fireplace stupidity diagnosed crocodile exploring sculpture stressful persuaded preserved champions psychotic motivated expanding exploding initially amendment targeting nervously inspiring organised processed whooshing amusement evidently parachute excessive punishing shrieking squawking practiced stretched deception hypocrite increases illegally intuition testified pneumonia medicines intercept courtyard attendant auditions reminding estimated collision admitting operative revealing countdown willingly powerless criticism proposing neglected welcoming disguised precision realizing alternate diversion cameraman abduction kidnapper margarita successor recruited prototype superiors pleasures stockings penthouse designers solicitor socialist converted necessity assassins certainty uncovered stationed liability whichever assembled northwest arrogance dependent scrambled expansion madeleine commotion belonging pineapple conceived mechanics boulevard obstacles infirmary scratches prejudice glamorous threshold housewife rejection cocktails southeast gibberish prevented sexuality sovereign voicemail spectacle awareness observing typically touchdown traumatic affecting calculate directing caretaker roommates adjourned concluded appearing replacing submitted fragrance harassing prominent justified birthdays prosecute doughnuts staircase solutions cleopatra fishermen lunchtime compelled sentiment improving withdrawn admirable indicated appealing uncertain southwest bloodshed offspring monstrous penetrate intervene tolerance thrilling undressed afterlife eccentric launching outsiders accessory stability threatens reactions practices fractured bourgeois ambitions screening premature communism northeast performer ingenious straining merchants illusions entrusted resisting concealed mandatory borrowing measuring exchanged ownership raspberry communion classmate economics screeches sweetness consulate parenting robberies strangest competent leftovers algorithm attorneys unnatural betraying telegraph sparkling unlimited supposing enchanted sarcastic liberated extortion guardians disciples senseless cockroach gunpowder withstand cardboard impulsive pollution nominated destroyer intensive opponents geography interpret preaching formality descended celestial videotape brightest molecules animation egyptians dishonest airplanes alligator forgiving syndicate memorable motorbike synthetic offenders patriotic reluctant shivering criticize bookstore workplace initiated donations artifacts allegedly fractures handshake protocols examining nightfall miniature waterfall disgusted allergies comparing intensity paragraph splashing commanded dominated testicles sniffling intrigued fertility amazingly sincerity dumplings deceiving corrupted certified insisting whispered accounted seemingly evacuated describes brutality sponsored disregard struggles suitcases shillings meatballs goddamned reflected molecular obnoxious presently projector detonator librarian duplicate gardening appalling livestock bathrooms scarecrow threesome maternity democrats wallpaper construct dominique overruled skeletons partially terminate improvise reasoning godmother highlight drugstore volcanoes immigrant squeezing postponed franchise irregular divisions component bracelets mythology primarily delusions obedience brigadier intrusion physicist actresses arranging energetic violating parasites violently abdominal coalition espionage incorrect automated treachery stretcher masculine misplaced designing investing enlighten fashioned historian nationals torpedoes disgraced intellect adjusting religions hammering audiences vigilante teammates generated squirrels prospects recycling considers horseback travelers portfolio exploited intruders promoting elevators panicking paralysis ferocious enjoyable unusually strippers voluntary sophomore medallion plaintiff emptiness concierge hereafter deposited distances secretive hostility conflicts andromeda organisms regretted narrative dignified diversity crunching overrated reservoir catholics untouched monsignor fortnight overthrow obsessive unmarried mercenary restraint unleashed surgeries advancing mentality encrypted murderous checkmate delirious processes acquitted vacations avalanche editorial resembles freelance plausible resulting phenomena precedent blindfold offscreen endurance advertise barbarian unanimous tormented consulted afterward perverted surrogate grumbling inquiries peninsula tolerated specimens assailant paramedic capturing disasters inflation blackjack irritated reduction undermine victories detection subjected teachings sleepover jellyfish municipal proximity desirable proposals revolting imitation footprint stupidest displayed sightings monitored cosmetics outskirts informing schedules unhealthy concubine holocaust sleepless placement apparatus samaritan perceived catalogue socialism oversight suffocate roadblock paparazzi strengths luxurious purgatory horoscope departing misguided commodore theorists believers obligated eternally repulsive crucified customary billboard separates clockwork pressures equations reproduce blueberry financing implement supervise analyzing matrimony reviewing potassium postcards filmmaker etiquette envelopes davenport limousine portraits magnitude prescribe interface blindness stretches auxiliary swordsman incentive porcelain remarried firepower captioned stairwell memorized sabotaged abundance barricade scrubbing farmhouse freighter partridge stripping hypocrisy lucrative endlessly listeners malicious labyrinth planetary diplomacy skeptical healthier possesses extracted arthritis mortality corridors astronomy oppressed assurance unnoticed agreeable defective tombstone speculate inflicted stabilize youngster harmonica heartache intruding horrified lovebirds rewarding recession societies colourful valuables crossword downright magically accordion cowardice discovers ballerina streaming navigator marseille awakening meteorite frankfurt fictional perpetual disobeyed firsthand lifeguard discarded specifics rehearsed cleansing pepperoni dissolved casserole frightens grandkids souvenirs assisting offerings authorize featuring scapegoat provinces reconcile unrelated captivity crumbling commodity riverside dismissal penniless patiently relevance grotesque detecting nevermind transfers residency responses mainframe sociopath nighttime craziness ballistic unethical monuments chronicle trademark cherished inability liberties ancestral enjoyment bangalore employers painfully canceling nostalgia merciless anarchist tampering chaperone ultimatum pedophile directive fugitives mutilated plutonium asparagus blasphemy newlyweds spokesman itinerary scripture embracing gladiator whinnying supplying vandalism shrinking garibaldi purposely stimulate misjudged clubhouse declaring nutrients deserving ludicrous biography concludes repressed explorers highlands paternity complains repairing magicians paramount shepherds frivolous copyright electrons inhabited migration hardships underwood clientele collapses medically consensus maneuvers gibbering realities disorders delegates pathology anomalies dormitory nutrition intensely saxophone thrusters homicidal uninvited campaigns resistant damnation toothless immensely butchered reckoning coworkers aeroplane innocents shootings estimates wolverine notebooks exemplary replicate perfected adversary projected visionary talkative heartfelt unwilling graduates thrashing vibration petrified attentive negatives guerrilla startling storeroom rejecting schooling wasteland blueprint nostalgic timetable nightgown suppliers apprehend scenarios insolence deodorant hierarchy detectors munitions attitudes homicides seduction hazardous asteroids sheltered variation milkshake undertake bumblebee ingenuity visualize prolonged lecturing developer housework smugglers consuming plastered humankind partisans birthmark supporter traveller inventing chameleon charities wholesale operators comedians polygraph recipient resigning polishing cranberry governess achieving overslept unloading whirlwind hairstyle aesthetic directory priestess discredit stumbling pulmonary punctured checkbook civilised pressured hesitated finalists medicinal mimicking addictive restoring cognitive biologist councilor crusaders creations implanted vanishing frightful taxpayers activists affidavit mannequin hillbilly degrading similarly manifesto bickering entourage conspired conceited universes coastline escorting furnished stressing originals appetizer treasurer redundant populated starlight surrounds landslide strolling cultivate extending severance digestive throbbing barrister betrothed emissions conqueror favorable subtitled intricate aristotle cannibals deduction pestering retrieved dismantle lingering entrances propeller bloodbath psychosis intending sculpting moonshine incurable wholesome occurring seductive ornaments reverence hooligans willpower bewitched sidelines defeating hydraulic cartridge packaging decorator alliances synagogue bombshell vertebrae limestone impending limitless showering defenders supernova remainder retreated galloping douchebag confessor flashback imperfect reconnect rearrange malignant intersect oblivious monologue bloodline logically safeguard fruitcake racetrack hepatitis publicist insistent tentacles archangel submerged enquiries menopause prognosis compounds nicknames variables minefield histories eyelashes umbrellas alignment whimsical obsessing impartial newcomers preschool ravishing selective gossiping ecosystem schoolboy aftermath reinforce qualifies provoking continuum observant disrupted divorcing retaliate diligence districts adversity telepathy proceeded millennia governors massacred portrayed hollering textbooks patronize dizziness knowingly festivals firehouse geologist cremation petroleum picturing purchases excitedly antarctic maintains foolproof scavenger middleman sickening toothache unpopular ordinance courtship shipments glorified cylinders radiology consumers excursion heartland scorpions obstinate diaphragm executing eradicate sunflower irritable overjoyed commissar fairytale spectator tragedies recurring occupying aphrodite presiding accessing stitching colonists tasteless lifetimes emphasize combining implicate unpacking nicknamed detonated shogunate contender illnesses chihuahua buttercup anonymity clippings smothered diplomats intervals creditors blossomed composite hindsight logistics balancing carriages courteous pamphlets detergent afflicted excrement locksmith nocturnal galleries doctorate sorceress shellfish handiwork disguises intestine judgments spineless astrology loveliest mistletoe innkeeper indicator surpassed radically announces sequences unlocking nurturing generates displaced forwarded penalties hunchback relocated treadmill resurrect strangler urinating seasoning chestnuts overgrown resilient blackouts bannister royalties mistaking abrasions unchanged sunscreen loitering bachelors forgetful fireflies deceitful marmalade completes requiring absorbing denounced sprinkles profiling lifesaver comforted promenade courtesan guitarist atrocious governing horseshit framework attackers mortified flammable estranged ascension dominance circulate inspected shuffling annulment umbilical shoelaces commandos processor ascertain deadliest reassured overreact fountains libraries arbitrary boardwalk scrapbook fantasize offending dashboard disagreed guacamole cardinals boundless overdoing blockhead harvested spiderman provision anchovies argentine magnetism remission hijacking sasquatch croissant kilograms elevation abolished turbulent expulsion flattened ambiguous posterity twitching crossfire mausoleum knackered successes expresses digestion metaphors trickster uncharted rendering pertinent illogical flustered violinist passwords sanctions refreshed intuitive harboring injecting loyalties inventive quicksand longevity multitude revolving dragonfly practised fortified shipwreck bellowing telegrams brainless boomerang readiness attribute midsummer snowflake negligent treasured blackbird foolishly momentous disengage kilometer paralysed momentary consented heartburn modelling resonance presenter signorina bacterial checklist britannia paintball droppings scorching electoral pacemaker disclosed registrar fortitude feathered albatross platforms sharpened catacombs bleachers autopilot sacrilege shoemaker opposites observers charlatan admiralty palanquin alchemist parchment vasectomy melodrama magnesium clutching squatting instances longitude milestone deceptive cavendish corkscrew versatile galapagos sacrament uplifting slingshot brochures decreased limelight backfired conniving ridiculed imbalance bulldozer leviathan incognito specified gladstone greyhound migraines mutations horseshoe overwhelm miserably entangled brotherly splinters subscribe gymnasium appliance reprimand bystander vigilance massively empowered dialogues manoeuvre wrestlers canisters workforce frostbite mortgages selecting sedatives beverages varieties nosebleed firstborn hypnotize socialize periscope toothpick destitute shielding immortals dispersed unwelcome amplified acquiring snatching partition anxiously craftsman tenacious shorthand contented centurion realising integrate thickness burlesque eavesdrop blackness seniority cucumbers databases eruptions oversized unearthed frontline snowstorm pistachio railroads reversing repairman agonizing inscribed induction deserters composing mongolian receptive abortions narration viewpoint boardroom supremacy methadone inquiring regionals justifies veritable endearing weakening freestyle forefront escalated relieving landlords bargained appetites streetcar atonement armistice prevailed simulated grievance goddesses daredevil organizer foresight crippling registers necklaces unveiling benefited homestead epileptic animosity predatory chamomile reputable elemental polyester impotence chevalier venerable transient exchanges islanders porcupine microchip detailing magdalene tangerine insidious applejack raindrops statutory summoning agitation escalator weirdness ransacked pediatric extremist billiards plentiful faculties botanical mortgaged quarreled squeamish euphemism tarnished beginners skydiving outbursts dictation quivering alleviate blowtorch endeavour tightened strapping saturated assigning computing sprinkler evidences pesticide adulthood renovated deserting sociology shortcuts antiquity custodian acquittal launchpad confesses retrieval forthwith grapevine womanizer occupants piggyback adjoining symbolism declining protested terrorize utilities unfolding recapture disbanded simpleton candidacy imbeciles syllables enclosure decimated indulging reopening reinstate quarterly contagion desertion simulator impetuous dollhouse succumbed tightrope unscathed resentful patronage academics deadlines discourse truckload unsettled chartered decidedly athletics headstone audacious cartilage twinkling badminton bolshevik conquests disbelief racehorse landmarks crackhead balthazar loathsome singsongy hourglass grappling molesting strumming mobilized solitaire microfilm mockingly sandstorm exhibited destinies strenuous curiously pantyhose centipede sportsman patriarch recollect frontiers exercised quotation embalming consisted unfounded reimburse woodhouse battering demeaning triangles obtaining employing gonorrhea nefarious overpower boathouse brimstone regulated armadillo whisperer photocopy impromptu seatbelts barracuda liberator misbehave lidocaine jailhouse devouring wherefore craftsmen aimlessly calendars firefight uploading shoveling posterior disbarred dysentery pretender turquoise pinkerton excavated bathhouse circuitry mediation saltwater castrated leisurely signaling surfboard preserves incubator houseboat caressing clipboard shortened chickened megaphone awkwardly perchance laughable housemaid unplugged finalized stainless whitehead anchorage chlamydia alienated newsstand symposium advisable cinematic vineyards repellent motorcade evaporate manifests cupboards repugnant trillions liquidate outnumber freshness sorrowful subatomic letterman musically lubricant sergeants overdosed martyrdom amputated rebelling ascending habitable blackened rendition squishing educating seclusion incarnate cutthroat impudence economist dandelion impounded reminisce televised telemetry precipice intrigues dispenser closeness twentieth mouthwash whirlpool bombarded stillness applauded pitchfork columnist overdrive rejoicing workshops undergone gardeners renounced squadrons patrolman fanatical judiciary pulsating sideburns sprinkled springing unguarded appraisal enigmatic depravity paychecks terrifies bountiful squirming gendarmes summarize mightiest makeshift clergyman plaything obscurity doubtless disagrees lollipops stringing messieurs flowering reconvene pondering rewriting composure persevere expressly transcend discounts journeyed falsified applicant shakedown fattening childless deviation womanhood undivided metabolic aluminium shoreline influenza squatters genitalia plundered staggered stalemate dickheads strutting harnessed behaviors dominates deterrent informers hairbrush shortness stopwatch medicated conundrum auctioned exceeding proactive persecute barbecued resembled forgeries badgering chieftain loudmouth downwards massaging migrating macintosh trickling sniveling headlight playhouse riverbank replenish townhouse uniformed sketching reprogram onslaught importing inaugural amazement testifies landowner vaporized rewinding pseudonym wallowing splendour infecting rationing evaluated diverting dictators innermost windmills deflector backwater earthling kangaroos undecided advocates petitions stateside boogeyman outspoken regiments belvedere commoners anxieties childlike hijackers unselfish artefacts shitheads dishonour skedaddle servitude receptors shadowing militants masterful regulator deafening routinely lifeboats underwent hitchhike geometric cornbread musketeer trimester excluding ceasefire cornfield tolerable drunkards betrothal goldsmith pessimist engraving statistic byzantine recruiter tarantula assessing quadruple reptilian shirtless massacres checkered contusion economies trampling deploying collusion detainees complicit retriever untrained splutters statesman commented cufflinks composers amenities debatable bubblegum acclaimed cameramen humongous activates mayflower exclusion jabbering endeavors backpacks digitally emigrated steadfast aerospace fabricate disinfect autopsies preachers dictating symbolize sceptical isolating sterilize clarified esophagus carpentry artichoke pretenses semantics recalling distantly mummified rewritten partnered distilled wormholes precincts allocated incumbent succulent speedboat confidant paralegal excelsior emergence surveying carnation dissolves dribbling servicing satisfies romancing reminders criticise faithless amplifier grandiose absurdity blameless intrusive blatantly pragmatic condensed foothills theatrics signifies debutante torchwood ventricle exonerate shortages homeowner cassettes embezzled colliding tinkering littering daylights concocted playfully underside shredding annoyance irritates seventies inanimate assertive blackwood clockwise apartheid diarrhoea complexes retaining labourers smoothies murderess motorboat bordering unnerving disposing swordfish reiterate adaptable tattooing groundhog nightlife kilometre incessant menstrual triumphed crossover infantile decadence unbridled barometer redheaded ovulating fermented crouching storybook sandstone emanating sidewalks workhouse brainwash perplexed licensing lawnmower numerical fruitless bookshelf subsidies camcorder notoriety immersion endowment firestorm hindrance obscenity treatable fractions narrowing festering pantomime voracious underfoot cotillion empirical acoustics vulgarity mortician tortoises masochist evergreen damnedest exemption mousetrap viciously schnitzel worshiped hedgehogs epicenter overtaken millionth lightbulb carcasses margarine parameter convinces regaining abducting insulated unwritten recreated figurines elongated adoration strictest continual inventors adjective stimulant financier comprised nursemaid onlookers arseholes sumptuous grounding reclaimed refueling tentative reprisals dividends pattering dissected orangutan vacancies beheading farewells snapshots puppeteer allotment sincerest shortstop ponderosa bedridden originate arraigned messaging backwoods formulate thankless consoling petticoat harrowing mincemeat skinheads polluting basements stockpile greenwood geriatric honorably imprinted impresses sphincter gallantry forfeited converter hoofbeats pentagram therapies mavericks grandsons tornadoes hypnotist colosseum infertile hundredth profanity prohibits quartered implosion ethically vacuuming knockouts hysterics unchecked depiction gargoyles grandmama dwindling localized guidebook prophetic weathered foolhardy bilateral aggressor buffaloes catatonic schematic carpeting styrofoam whosoever smooching depriving loneliest avoidance redeeming dastardly inhibitor feminists flaunting fingering cirrhosis sclerosis custodial stonewall laundered majesties furiously hairspray flamingos falsehood merriment valuation ambiguity taillight guarantor decreases astounded rainstorm ejaculate retailers dumpsters methodist befitting lecherous filtering contrived inclusive recorders brokerage fifteenth intercede drumstick conjuring semblance rummaging underpaid barnacles sweatshop squirting dreamland fidgeting lifeblood handbrake austerity portrayal commenced piercings receivers propelled backstory trappings designate withering poppycock attaching freshener dodgeball waistcoat bluegrass singleton parallels orderlies courtiers selfishly marinated trimmings adrenalin sandpaper terminals wellbeing repayment preceding neurology pensioner membranes summation embassies interlude treehouse tomorrows maddening posturing arrowhead brunettes profusely traceable barbecues manticore occipital parasitic georgette launchers scribbled neutrinos pigheaded admirably invasions empathize eastbound peacetime platelets harmonies disembark compiling renewable thrusting indignity groveling backfires mentoring runaround rainwater holograms serotonin tracksuit loopholes hideously jackasses mothballs radiating opportune motivates socialite shoeshine deformity caliphate keyboards sixteenth resolving enforcing fascinate ibuprofen congested popsicles armaments sorcerers vermilion prankster pheasants guesswork traipsing wanderers taekwondo cosmology depicting sugarcane inaudibly sprouting clobbered procreate insertion tardiness aggravate indulgent undergrad eloquence carnivore confronts swordsmen hermitage chipmunks backtrack tortillas turntable cloakroom silliness overthink inserting crescendo milligram lightness untreated vehicular temperate disarming excavator analysing spiraling bandstand palladium anecdotes lettering propriety excitable corrosive guerillas steamboat pioneered fertilize willfully synthesis scurrying celestine forsaking nourished saboteurs outgunned adulterer expectant stateroom easygoing transmits plummeted shipmates curvature colouring newsflash mastering cleverest insinuate remodeled spearhead hypnotism wriggling shriveled additions unclaimed retention loosening westbound juveniles pipsqueak rectangle asthmatic playmates handprint fireballs notifying supremely commended caregiver daydreams decompose drunkenly underdogs tearfully fledgling lobbyists catechism mysticism mustaches unfeeling roadhouse moonstone seashells refresher innocuous jailbreak enchilada harbinger conducive insincere eggshells earphones hostesses snitching kickbacks earnestly weaklings harvester ascendant driftwood speakeasy mothering assuredly engrossed waterways streamers stillborn macaroons anomalous indignant stallions cordially deference hygienist deficient ploughing pampering subpoenas temptress balconies brassiere cancerous steamship sideboard normality banknotes townsfolk cataracts inception snowballs retainers unhappily desecrate sugarcoat renegades branching frankness abolition elegantly daffodils starburst exporting cellulite maharajah emphysema incisions screwball cataclysm briefings undamaged warranted macchiato bluebeard sunstroke utilizing doctoring millstone insurgent devastate instilled headdress distracts honeycomb crucially energized resorting comforter swindling extradite brannigan wristband fraternal okeydokey revisions indecency grassland swordplay blacklist motorized lazybones narcissus alabaster interiors presuming whitewash triathlon validated incursion restrooms pneumatic pituitary magnified intubated precursor nonprofit ligaments citations greenhorn shortwave approving unsightly bullfight biometric downloads embarking moderator injurious enveloped prevalent dissipate scrambler instigate bedspread moneybags downriver dispersal compliant inverness outbreaks upgrading assertion inclusion surpasses pandering unmatched trousseau genealogy legalized biohazard peregrine diversify organizes promoters regretful symbiotic contested tailoring intensify commuters matriarch paralytic boatswain withdraws menagerie barbarous bloodshot worrisome channeled prostrate hatchback dexterity oppressor hangovers primaries egomaniac nighthawk positives notarized sharpener eagerness electrics enquiring footloose homemaker swimsuits childcare reclusive scrapping retractor tradesman tribesmen shitfaced throwback chrysalis fisheries indelible bacterium dentistry breaching drawbacks objecting undertook egregious nakedness storyline anguished speedster crossings ignoramus underline crossroad enhancing cortisone sprawling unzipping deflected coincides curveball blaspheme persisted hesitates beanstalk digesting heirlooms bloodless breakaway hankering shipshape eroticism displease overdraft softening ballpoint actuality ramblings verifying bodacious shipyards erections firmament escapades snatchers inhibited sentinels yammering headfirst strangles homegrown fistfight matchbook apathetic cathartic canvassed burrowing caesarean patchwork unplanned rampaging cryogenic drainpipe barbarism surrogacy hopscotch bandwagon dressings enlisting worsening ingrained ephemeral libertine telepaths reforming dissident romantics veronique foreclose riverboat appraised prospered slandered punctures colonized repainted construed rescinded neolithic bloodlust capacitor chortling pimpernel flagstaff providers swindlers manliness columbine grizzlies proclaims tarnation ayatollah overlords reflector perennial provolone concourse overdrawn incidence scrimmage headliner woodchuck firewalls profiting broadband lullabies depresses seedlings foreheads sapphires southland paperback waistband exuberant bloodiest perdition blindside ginormous muchachos sweetener bandwidth motivator combative pendragon sidekicks pheromone asserting toughness kitchener embellish carbonate spherical conjoined outwardly whitewood indemnity outweighs grounders bookmaker walkabout shortcake expedient balaclava outwitted sparklers crosswalk detaining buckwheat tiredness resonates oxycodone gratified amphibian examiners disabling bilingual valiantly reachable laxatives underling bungalows salesgirl buttering surfacing acropolis potpourri evocative laminated purifying sidelined publishes statewide lethargic prompting marauders dwellings simmering hydroxide stipulate waistline sunburned authorise nevermore scholarly appendage berserker untenable miniskirt anchorman melodious rationale byproduct formative streaking ethnicity animators debriefed reloading coincided starships harlequin imprudent cosmonaut encircled extorting repentant deadbeats affiliate olfactory fireproof macadamia moderates hibernate vagabonds foundling numbskull pollyanna spacesuit torpedoed expedited hindering obstinacy weariness dispensed dislodged palatable pessimism worcester favorably overcomes fornicate retracted leukaemia headboard earthworm transpose coriander migratory taxidermy mentalist courtside sourdough unearthly hairdryer strongman snowboard conferred interject defection upholding godliness malleable corrosion birdhouse bulkheads urologist appellate dramatics lacerated doorknobs patronise altitudes metronome withstood munchkins epidemics underpass squabbles stabilise detriment modernity motocross lamenting rainmaker pathogens showgirls airfields penalized palisades equitable recharged pillaging agitators inference flapjacks ovulation letterbox backboard decathlon geraniums calibrate connector slimeball watershed revolvers delegated disputing edelweiss flatterer stockroom abnormals fragility mystified castaways cellblock expelling mailboxes bunkhouse jockstrap electrode ostriches skyrocket pipelines bratwurst satirical beckoning extremism urination publicize relegated propagate endorsing modifying combatant requisite humanoids cluttered procuring dachshund overlooks pervasive bulletins stowaways embroider facetious patterned liquorice sprinting outfitted excepting distended intrinsic digitalis dreamboat prattling cricketer unwrapped sanitizer patrolled hurriedly relatable pavements persimmon detonates unspoiled statesmen miscreant erroneous fostering womenfolk stilettos follicles inversion tunneling harnesses panchayat perturbed enforcers motorists deductive statuette tiptoeing mescaline cornering lionesses dismember torturous hardwired sodomized semifinal sufferers averaging archetype fervently honouring rivalries glandular celluloid miniscule bellyache defeatist flowerpot tradesmen abhorrent colluding molesters coveralls lightened bluebirds frustrate sweetened dauntless sportsmen eminently homophobe vivacious impostors sleazebag petechial aggrieved whereupon guardsmen truncheon extricate amazonian reuniting seafaring fearfully mosquitos resection confiding sleepwalk perceives extremity unopposed washcloth inundated leveraged draconian bleaching squashing crackdown revulsion teardrops jewellers appraiser commuting pussycats straights ayahuasca symbiosis resenting inshallah cautioned schilling darkening loyalists automaton zookeeper brightens personals bypassing surveyors mezzanine ventilate preserver unfocused entranced beekeeper criterion fairyland scuffling absconded satanists sideswipe vestibule immovable pharisees wuthering advocated newsreels marathons roughness desperado haphazard chapstick headshots jambalaya ricochets adulation forecasts brainwave cheekbone colorless heretical hamstring proofread lampshade itinerant panoramic nauseated initiates overflows throwaway picketing innovator venturing lorazepam resurface distanced embryonic northward unwitting loincloth escalates underhand consigned periphery professed dalmatian arsonists ingesting misshapen valkyries faltering minstrels jitterbug middlemen interlock carjacked gazillion scribbles whiteness insomniac cartouche instructs benchmark rectified commences dalliance repenting ducklings stoplight semesters southerly republics unraveled scoliosis educators manicured curiouser snakebite acrobatic solicited superglue siphoning confining penitence cacophony evildoers repossess expansive officiate moccasins depletion beauteous maelstrom yearbooks lunchroom conveying stringent coattails pocketful cartwheel retracing rerouting critiques occupancy pirouette fumigated referrals footfalls facsimile tormentor panhandle compasses nastiness earmarked shrubbery counseled beguiling teamsters parabolic rumblings sculptors paradoxes psoriasis teaspoons stiffness worldview litigator attrition altimeter doctrines stakeouts buccaneer inflating pulverize endangers sommelier accolades hotheaded comebacks hallmarks subsidize defectors raincoats aggregate lumbering blizzards embroiled twiddling disparity emaciated birdbrain cattleman betrayals regulates unleashes ponytails makeovers hardening protester repulsion reclining cascading finalised hydration additives squinting triumphal soldering viability deuterium wolfsbane teetering gardenias imposters inorganic erogenous radiators telephoto catapults smoothing carbonara outlining unhelpful harmonium tollbooth exchequer reappears replaying snuggling flavoured timeframe tolerates omelettes archivist lawmakers dependant venerated absorbent harmonize gestation compadres unsullied emphasise belittled poorhouse augmented gruelling watchdogs parochial injectors diagnoses premieres resetting flinching bizarrely venetians contrasts woodlands ingestion congenial scrapings crackpots spaceport condoning secretion deathtrap debauched archenemy reelected caballero sectioned oversleep footballs manicures cellmates angiogram strapless defrauded minuscule barreling revisited overtures probative timepiece compactor beachhead overthrew lawyering condenser searchers bismillah uprisings jellybean academies laborious harshness headpiece dynasties artisanal cavorting plaintive undaunted lookalike opposable sediments unskilled idealized undergoes liquefied glassware wealthier jealously rekindled snakeskin smartness embezzler unsecured marauding memorised pompadour attendees lakeshore colostomy patchouli smoothest orthodoxy phosphate tightness wrangling sterility visualise decrypted frivolity handstand frequents whittling manganese mangroves flophouse reprieved apostolic guffawing zoologist seaworthy discusses salacious backyards carpaccio daiquiris emigrants clenching hyperbole timelines heaviness sainthood sugarplum constancy acetylene liquidity countered numbering mammogram cessation filaments ceaseless deputized memorials baseballs convening overwatch gyroscope concussed complying stargazer interning scrolling ruination turnstile rechecked elevating talismans extractor strongarm reformers intendant vaccinate lipsticks subjugate joyriding workspace watermark slouching shapeless stratagem chopstick gangplank jihadists overrides felonious sharpness concerted ectoplasm sheepskin herbalist sesterces interacts differing empanadas beefsteak deepening moonbeams microcosm tamponade immutable bathwater immensity modulator broadside doubloons modernize halitosis perishing duplicity biosphere castellan enriching ambushing westerner mongoloid pictorial paparazzo multiplex fingertip tenements copacetic horseplay cauterize jumpsuits overblown pilfering socialise padlocked magnifico hairpiece personage dampening catharsis aqueducts dignitary bedsheets patrolmen exorcisms chickpeas xylophone scratcher demeanour stabbings trumpeter borrowers redefined oligarchs".split(' ')
+
+ROUND_SETS = {
+    'quick':    ['letters', 'numbers', 'conundrum'],
+    'standard': ['letters', 'numbers', 'letters', 'numbers', 'conundrum'],
+    'full':     ['letters', 'numbers', 'letters', 'numbers', 'letters', 'conundrum'],
+}
+
+LOCK = threading.Lock()
+
+def fresh_room():
+    return {
+        'version': 1, 'matchId': 0, 'phase': 'lobby',
+        'players': [None, None],          # {id,name,lastSeen}
+        'scores': [0, 0],
+        'night': {'wins': [0, 0], 'matches': 0},
+        'first': 0,                       # which seat picks first this match
+        'rounds': [], 'roundIndex': 0, 'roundType': None, 'picker': 0,
+        'letters': [], 'vowels': 0, 'cons': 0,
+        'numbers': None, 'target': 0,
+        'scram': '', '_answer': '',       # _answer kept secret
+        'subs': [None, None], 'done': [False, False],
+        'buzz': None, 'result': None, 'boardAt': 0.0,
+    }
+
+ROOM = fresh_room()
+
+def bump():
+    ROOM['version'] += 1
+
+def now():
+    return time.time()
+
+# ---------- round mechanics ----------
+def setup_round(idx):
+    r = ROOM
+    r['roundType'] = r['rounds'][idx]
+    r['picker'] = (idx + r['first']) % 2
+    r['letters'] = []; r['vowels'] = 0; r['cons'] = 0
+    r['numbers'] = None; r['target'] = 0
+    r['scram'] = ''; r['_answer'] = ''
+    r['subs'] = [None, None]; r['done'] = [False, False]
+    r['buzz'] = None; r['result'] = None; r['boardAt'] = 0.0
+    r['phase'] = 'round'
+    if r['roundType'] == 'conundrum':
+        w = random.choice(CONUNDRUM_WORDS)
+        s = list(w)
+        while ''.join(s) == w:
+            random.shuffle(s)
+        r['_answer'] = w; r['scram'] = ''.join(s)
+        r['boardAt'] = now()
+
+def draw_letter(kind):
+    r = ROOM
+    if len(r['letters']) >= 9:
+        return
+    if kind == 'v':
+        r['letters'].append(random.choice(VOWEL_BAG)); r['vowels'] += 1
+    else:
+        r['letters'].append(random.choice(CONS_BAG)); r['cons'] += 1
+    if len(r['letters']) == 9:
+        r['boardAt'] = now()
+
+def auto_fill_letters():
+    r = ROOM
+    while len(r['letters']) < 9:
+        left = 9 - len(r['letters'])
+        if r['vowels'] < 3 and left <= (3 - r['vowels']):
+            draw_letter('v')
+        elif r['cons'] < 4 and left <= (4 - r['cons']):
+            draw_letter('c')
+        elif random.random() < 0.42 and r['vowels'] < 5:
+            draw_letter('v')
+        elif r['cons'] < 6:
+            draw_letter('c')
+        else:
+            draw_letter('v')
+
+def deal_numbers(num_large):
+    r = ROOM
+    num_large = max(0, min(4, int(num_large)))
+    large = random.sample([25, 50, 75, 100], num_large)
+    bag = []
+    for n in range(1, 11):
+        bag += [n, n]
+    random.shuffle(bag)
+    small = bag[:6 - num_large]
+    nums = large + small
+    random.shuffle(nums)
+    r['numbers'] = nums
+    r['target'] = random.randint(101, 999)
+    r['boardAt'] = now()
+
+def len_score(w):
+    if not w: return 0
+    return 18 if len(w) == 9 else len(w)
+
+def num_score(dist):
+    if dist == 0: return 10
+    if dist <= 5: return 7
+    if dist <= 10: return 5
+    return 0
+
+def finalize_round():
+    r = ROOM
+    rt = r['roundType']
+    if rt == 'letters':
+        w0 = (r['subs'][0] or {}).get('word', '') or ''
+        w1 = (r['subs'][1] or {}).get('word', '') or ''
+        p0, p1 = len_score(w0), len_score(w1)
+        a0 = a1 = 0; winner = None
+        if len(w0) > len(w1):
+            a0 = p0; winner = 0
+        elif len(w1) > len(w0):
+            a1 = p1; winner = 1
+        else:
+            a0, a1 = p0, p1  # equal length: both score
+        r['scores'][0] += a0; r['scores'][1] += a1
+        r['result'] = {'subs': [{'word': w0, 'pts': a0}, {'word': w1, 'pts': a1}], 'winner': winner}
+    elif rt == 'numbers':
+        v0 = (r['subs'][0] or {}).get('value', None)
+        v1 = (r['subs'][1] or {}).get('value', None)
+        d0 = abs(v0 - r['target']) if isinstance(v0, int) else 10**9
+        d1 = abs(v1 - r['target']) if isinstance(v1, int) else 10**9
+        a0 = a1 = 0; winner = None
+        if d0 < d1:
+            a0 = num_score(d0); winner = 0
+        elif d1 < d0:
+            a1 = num_score(d1); winner = 1
+        else:
+            if d0 < 10**9:
+                a0 = a1 = num_score(d0)
+        r['scores'][0] += a0; r['scores'][1] += a1
+        r['result'] = {'subs': [{'value': v0, 'pts': a0}, {'value': v1, 'pts': a1}], 'winner': winner}
+    r['phase'] = 'reveal'
+
+def finalize_match():
+    r = ROOM
+    s0, s1 = r['scores']
+    if s0 > s1: r['night']['wins'][0] += 1
+    elif s1 > s0: r['night']['wins'][1] += 1
+    r['phase'] = 'matchover'
+
+def check_timeouts():
+    r = ROOM
+    if r['phase'] != 'round' or r['boardAt'] <= 0:
+        return
+    t = now() - r['boardAt']
+    if r['roundType'] == 'conundrum':
+        if t > 33 and not r['buzz']:
+            r['result'] = {'conWord': r['_answer'], 'winner': None}
+            r['phase'] = 'reveal'; bump()
+    else:
+        if t > 40 and not (r['done'][0] and r['done'][1]):
+            finalize_round(); bump()
+
+# ---------- public view ----------
+def public():
+    r = ROOM
+    def pview(p):
+        if not p: return None
+        return {'name': p['name'], 'connected': (now() - p['lastSeen'] < 3.0)}
+    out = {
+        'version': r['version'], 'matchId': r['matchId'], 'phase': r['phase'],
+        'players': [pview(r['players'][0]), pview(r['players'][1])],
+        'scores': r['scores'], 'night': r['night'],
+        'rounds': r['rounds'], 'roundIndex': r['roundIndex'], 'roundType': r['roundType'],
+        'picker': r['picker'], 'letters': r['letters'], 'vowels': r['vowels'], 'cons': r['cons'],
+        'numbers': r['numbers'], 'target': r['target'], 'scram': r['scram'],
+        'submitted': [r['done'][0], r['done'][1]],
+        'buzz': (r['buzz']['seat'] if r['buzz'] else None),
+        'result': r['result'],
+    }
+    return out
+
+# ---------- actions ----------
+def find_seat(pid):
+    for i in (0, 1):
+        if ROOM['players'][i] and ROOM['players'][i]['id'] == pid:
+            return i
+    return -1
+
+def handle_join(pid, name):
+    seat = find_seat(pid)
+    if seat >= 0:
+        ROOM['players'][seat]['name'] = name or ROOM['players'][seat]['name']
+        ROOM['players'][seat]['lastSeen'] = now()
+        return seat
+    for i in (0, 1):
+        if not ROOM['players'][i]:
+            ROOM['players'][i] = {'id': pid, 'name': name or ('Player ' + str(i + 1)), 'lastSeen': now()}
+            bump()
+            return i
+    return -1  # spectator
+
+def handle_act(data):
+    pid = data.get('id'); typ = data.get('type')
+    seat = find_seat(pid)
+    if seat >= 0:
+        ROOM['players'][seat]['lastSeen'] = now()
+    r = ROOM
+    extra = {}
+
+    if typ == 'leave':
+        if seat >= 0:
+            ROOM['players'][seat] = None; bump()
+        return extra
+
+    if typ == 'startMatch' and seat == 0 and r['phase'] == 'lobby' and r['players'][0] and r['players'][1]:
+        r['rounds'] = ROUND_SETS.get(data.get('len', 'standard'), ROUND_SETS['standard'])
+        r['matchId'] += 1; r['night']['matches'] += 1
+        r['scores'] = [0, 0]; r['first'] = 0; r['roundIndex'] = 0
+        setup_round(0); bump(); return extra
+
+    if typ == 'pickLetter' and r['phase'] == 'round' and r['roundType'] == 'letters' and seat == r['picker']:
+        kind = data.get('kind')
+        if kind == 'auto':
+            auto_fill_letters(); bump()
+        elif len(r['letters']) < 9:
+            left = 9 - len(r['letters'])
+            if kind == 'v' and not (r['vowels'] >= 5 or left <= (4 - r['cons'])):
+                draw_letter('v'); bump()
+            elif kind == 'c' and not (r['cons'] >= 6 or left <= (3 - r['vowels'])):
+                draw_letter('c'); bump()
+        return extra
+
+    if typ == 'dealNumbers' and r['phase'] == 'round' and r['roundType'] == 'numbers' and seat == r['picker'] and r['numbers'] is None:
+        deal_numbers(data.get('large', 0)); bump(); return extra
+
+    if typ == 'submit' and r['phase'] == 'round' and seat in (0, 1) and r['roundType'] in ('letters', 'numbers'):
+        if r['roundType'] == 'letters':
+            w = (data.get('word') or '').lower()
+            r['subs'][seat] = {'word': w if w.isalpha() else ''}
+        else:
+            v = data.get('value', None)
+            r['subs'][seat] = {'value': int(v) if isinstance(v, (int, float)) and v is not None else None}
+        r['done'][seat] = True
+        if r['done'][0] and r['done'][1]:
+            finalize_round()
+        bump(); return extra
+
+    if typ == 'buzz' and r['phase'] == 'round' and r['roundType'] == 'conundrum' and seat in (0, 1):
+        if r['buzz'] is None and (data.get('word') or '').lower() == r['_answer']:
+            r['buzz'] = {'seat': seat}
+            r['scores'][seat] += 10
+            r['result'] = {'conWord': r['_answer'], 'winner': seat}
+            r['phase'] = 'reveal'; bump()
+            extra['buzzAccepted'] = True
+        else:
+            extra['buzzAccepted'] = False
+        return extra
+
+    if typ == 'next' and r['phase'] == 'reveal':
+        r['roundIndex'] += 1
+        if r['roundIndex'] >= len(r['rounds']):
+            finalize_match()
+        else:
+            setup_round(r['roundIndex'])
+        bump(); return extra
+
+    if typ == 'rematch' and seat == 0 and r['phase'] == 'matchover':
+        r['matchId'] += 1; r['night']['matches'] += 1
+        r['scores'] = [0, 0]; r['first'] = 1 - r['first']; r['roundIndex'] = 0
+        setup_round(0); bump(); return extra
+
+    return extra
+
+# ---------- HTTP ----------
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def _send(self, code, body, ctype='application/json'):
+        if isinstance(body, (dict, list)):
+            body = json.dumps(body).encode('utf-8')
+        elif isinstance(body, str):
+            body = body.encode('utf-8')
+        self.send_response(code)
+        self.send_header('Content-Type', ctype)
+        self.send_header('Content-Length', str(len(body)))
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_OPTIONS(self):
+        self._send(204, b'')
+
+    def do_GET(self):
+        u = urlparse(self.path)
+        if u.path in ('/', '/index.html', '/countdown-lan.html'):
+            try:
+                with open(HTML_PATH, 'rb') as f:
+                    self._send(200, f.read(), 'text/html; charset=utf-8')
+            except FileNotFoundError:
+                self._send(500, 'countdown-lan.html not found next to server.py', 'text/plain')
+            return
+        if u.path == '/api/state':
+            with LOCK:
+                check_timeouts()
+                q = parse_qs(u.query)
+                pid = (q.get('id') or [''])[0]
+                s = find_seat(pid)
+                if s >= 0:
+                    ROOM['players'][s]['lastSeen'] = now()
+                self._send(200, {'version': ROOM['version'], 'room': public()})
+            return
+        self._send(404, {'error': 'not found'})
+
+    def do_POST(self):
+        u = urlparse(self.path)
+        length = int(self.headers.get('Content-Length', 0) or 0)
+        raw = self.rfile.read(length) if length else b'{}'
+        try:
+            data = json.loads(raw.decode('utf-8') or '{}')
+        except Exception:
+            data = {}
+        if u.path == '/api/join':
+            with LOCK:
+                check_timeouts()
+                seat = handle_join(data.get('id', ''), (data.get('name') or '').strip()[:14])
+                self._send(200, {'seat': seat, 'version': ROOM['version'], 'room': public()})
+            return
+        if u.path == '/api/act':
+            with LOCK:
+                check_timeouts()
+                extra = handle_act(data)
+                resp = {'ok': True, 'version': ROOM['version'], 'room': public()}
+                resp.update(extra)
+                self._send(200, resp)
+            return
+        self._send(404, {'error': 'not found'})
+
+
+def lan_ips():
+    ips = set()
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80)); ips.add(s.getsockname()[0]); s.close()
+    except Exception:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None):
+            ip = info[4][0]
+            if '.' in ip and not ip.startswith('127.'):
+                ips.add(ip)
+    except Exception:
+        pass
+    return sorted(ips)
+
+
+def main():
+    port = 8000
+    if len(sys.argv) > 1:
+        try: port = int(sys.argv[1])
+        except ValueError: pass
+    httpd = ThreadingHTTPServer(('0.0.0.0', port), Handler)
+    print('\n  The Countdown Game  —  LAN host is running')
+    print('  ' + '-' * 44)
+    ips = lan_ips()
+    if ips:
+        print('  On THIS computer, open:   http://localhost:%d' % port)
+        print('  On the OTHER computer(s), open one of:')
+        for ip in ips:
+            print('       http://%s:%d' % (ip, port))
+    else:
+        print('  Open:  http://localhost:%d' % port)
+    print('  ' + '-' * 44)
+    print('  Both players: open the address, then choose "Play over LAN".')
+    print('  Press Ctrl+C to stop.\n')
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print('\n  Stopped. Thanks for playing!')
+
+
+if __name__ == '__main__':
+    main()
